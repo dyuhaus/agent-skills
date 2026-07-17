@@ -5,14 +5,18 @@ entrypoint for Codex, Hermes, Claude Code, and any future assistant harness.
 
 ## Project
 
-Portable, harness-neutral agent skills: Obsidian vault management, secure secret intake, standing artifacts, quant research rigor
+Portable, harness-neutral agent skills: Obsidian vault management, secure secret
+intake, standing artifacts, and quant research rigor.
 
-<!-- Expand: architecture, key directories, native build/test commands, and any
-     project-specific conventions an agent must respect before changing code. -->
+Layout: each top-level folder is one skill — a `SKILL.md` (YAML front-matter:
+`name`, `description`) plus optional `scripts/` (Python 3 stdlib only) and
+`references/`. `install.sh` symlinks the skill folders into agent skill
+directories. There is no build step; scripts have no third-party dependencies.
+Keep every skill genericized and free of machine-specific paths or private data
+(this repo is public — use placeholders like `$VAULT_PATH`).
 
 ## Rules
 
-- Read `/home/dyadmin/AGENTS.md` first for the machine-level contract.
 - Read this repo's `README.md`, manifests, scripts, and tests before changing
   behavior.
 - Never read, print, commit, or publish secrets, local `.env` values,
@@ -22,12 +26,11 @@ Portable, harness-neutral agent skills: Obsidian vault management, secure secret
 - Use the project's native test/build commands for validation; document any
   missing or unavailable checks.
 
-## Git Workflow (machine standard)
-This repo follows /home/dyadmin/AGENTS.md "Git Workflow Standard".
+## Git Workflow
 - Default branch: main (protected, PR-only, squash merge)
 - Branches: feat/ fix/ chore/ docs/ exp/ (+ agent/<harness>/ optional)
 - Commits: Conventional Commits; hooks must pass; never --no-verify
 - Review: CodeRabbit auto-reviews PRs (config: .coderabbit.yaml); address all
   findings, then request David's approval (agent PRs require it)
-- Deploy coupling: <none | "merging main deploys to X — humans merge">
-- Long-lived branch exceptions: <none | list + purpose>
+- Deploy coupling: none (this repo ships skill files; nothing is deployed on merge)
+- Long-lived branch exceptions: none
