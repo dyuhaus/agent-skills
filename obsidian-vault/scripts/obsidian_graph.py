@@ -5,8 +5,14 @@ creation for a vault, deterministically.
 Stdlib only. See ../SKILL.md for the domain knowledge and usage.
 
 Configure the vault with the VAULT_PATH environment variable or --vault, the
-category root folder with --categories-root, and the table-of-contents note
-with --toc.
+category root folder with VAULT_CATEGORIES_ROOT or --categories-root, and the
+table-of-contents note with VAULT_TOC or --toc.
+
+This script FAILS CLOSED. There are no implicit defaults: an unset VAULT_PATH
+is an error, not "the current directory", and the target must contain an
+.obsidian/ directory before anything is created. Every variable a command needs
+must be set explicitly, so a forgotten export can never quietly write a folder
+and a note into the wrong tree. Setup errors exit 2 and write nothing.
 
 graph.json anatomy (flat JSON object at <vault>/.obsidian/graph.json):
   - colorGroups: [ {"query": "<search query>", "color": {"a": 1, "rgb": <int>}} ]
@@ -24,11 +30,14 @@ import shutil
 import subprocess
 import sys
 
-DEFAULT_VAULT = os.environ.get("VAULT_PATH", ".")
-# Root folder (relative to the vault) that holds category folders. Empty means
-# categories are folders directly under the vault root.
-DEFAULT_CATEGORIES_ROOT = os.environ.get("VAULT_CATEGORIES_ROOT", "")
-DEFAULT_TOC_REL = os.environ.get("VAULT_TOC", "Table of Contents.md")
+# No fallbacks on purpose: None means "not configured", which is a hard error.
+# An empty VAULT_CATEGORIES_ROOT is a deliberate choice (categories sit directly
+# under the vault root) and is distinct from an unset one.
+DEFAULT_VAULT = os.environ.get("VAULT_PATH")
+DEFAULT_CATEGORIES_ROOT = os.environ.get("VAULT_CATEGORIES_ROOT")
+DEFAULT_TOC_REL = os.environ.get("VAULT_TOC")
+
+SETUP_EXIT = 2  # same meaning as vault-link-check.py: misconfigured, did nothing
 
 # ~20-color categorical palette (hex). new-category auto-picks the first color
 # here not already used by an existing group.
@@ -85,6 +94,84 @@ def group_is_parent_of(parent_group, child_query):
             if is_proper_path_prefix(pp, cp):
                 return True
     return False
+
+
+# --------------------------------------------------------------------------
+# fail-closed configuration
+# --------------------------------------------------------------------------
+def setup_error(message, *hints):
+    """Refuse to run. Exits 2 having written nothing."""
+    sys.stderr.write("ERROR: %s\n" % message)
+    for hint in hints:
+        sys.stderr.write("       %s\n" % hint)
+    raise SystemExit(SETUP_EXIT)
+
+
+def looks_like_a_vault(path):
+    """An Obsidian vault is a directory holding an .obsidian/ config folder."""
+    return os.path.isdir(os.path.join(path, ".obsidian"))
+
+
+def validate_config(args):
+    """Refuse to touch anything unless the target is demonstrably a vault and
+    every variable THIS command needs is set.
+
+    Runs before any command handler, so a missing export fails closed instead of
+    creating folders and notes in whatever directory the agent happened to be
+    standing in.
+    """
+    if args.vault is None:
+        setup_error(
+            "no vault configured.",
+            "Set VAULT_PATH, or pass --vault /path/to/YourVault.",
+            "Refusing to fall back to the current directory.",
+        )
+    args.vault = os.path.expanduser(args.vault)
+    if not os.path.isdir(args.vault):
+        setup_error("vault %r is not a directory." % args.vault,
+                    "Check VAULT_PATH / --vault.")
+    if not looks_like_a_vault(args.vault):
+        setup_error(
+            "%r has no .obsidian/ directory, so it is not an Obsidian vault."
+            % args.vault,
+            "Refusing to create folders, notes or graph.json outside a vault.",
+            "Point VAULT_PATH / --vault at the vault root.",
+        )
+
+    if args.cmd != "new-category":
+        return
+
+    if args.categories_root is None:
+        setup_error(
+            "no categories root configured.",
+            "Set VAULT_CATEGORIES_ROOT, or pass --categories-root.",
+            "Use --categories-root '' only if categories sit at the vault root.",
+        )
+    if args.categories_root:
+        root_abs = os.path.join(args.vault, *args.categories_root.split("/"))
+        if not os.path.isdir(root_abs):
+            setup_error(
+                "categories root %r does not exist under the vault (%s)."
+                % (args.categories_root, root_abs),
+                "Check VAULT_CATEGORIES_ROOT / --categories-root.",
+            )
+
+    if args.no_note:
+        return
+    if args.toc is None:
+        setup_error(
+            "no table-of-contents note configured.",
+            "Set VAULT_TOC, or pass --toc.",
+            "Use --no-note to skip the index note and the hub link entirely.",
+        )
+    toc_abs = os.path.join(args.vault, *args.toc.split("/"))
+    if not os.path.isfile(toc_abs):
+        setup_error(
+            "table-of-contents note not found at %s." % toc_abs,
+            "Check VAULT_TOC / --toc.",
+            "A category whose note is not hub-linked is an orphan on creation, "
+            "so this is refused rather than warned about.",
+        )
 
 
 # --------------------------------------------------------------------------
@@ -349,8 +436,10 @@ def cmd_new_category(args):
                     f.write(sep + link_line + "\n")
                 print("appended TOC link -> %s" % toc_abs)
         else:
-            sys.stderr.write("WARNING: TOC not found at %s; add the hub link "
-                             "manually.\n" % toc_abs)
+            setup_error(
+                "TOC vanished at %s; the hub link was not written." % toc_abs,
+                "Add the hub link by hand, or re-run once the TOC is back.",
+            )
 
     # 3. color group
     if exists_in_graph:
@@ -377,7 +466,10 @@ def cmd_new_category(args):
     print("")
     print("REMINDER: verify hub-linking with vault-link-check.py "
           "(in this scripts/ directory), e.g.:")
-    print("  python3 vault-link-check.py --vault %r --toc %r" % (vault, args.toc))
+    if args.toc is None:
+        print("  python3 vault-link-check.py --vault %r --toc <your TOC>" % vault)
+    else:
+        print("  python3 vault-link-check.py --vault %r --toc %r" % (vault, args.toc))
     print("REMINDER: restart Obsidian so it picks up the graph.json change "
           "(and does not overwrite it).")
     return 0
@@ -392,13 +484,16 @@ def build_parser():
         description="Manage Obsidian graph-view color groups and vault categories.",
     )
     p.add_argument("--vault", default=DEFAULT_VAULT,
-                   help="vault root (default: $VAULT_PATH, else current dir)")
+                   help="vault root (default: $VAULT_PATH; required — there is "
+                        "no current-directory fallback)")
     p.add_argument("--categories-root", default=DEFAULT_CATEGORIES_ROOT,
                    help="folder (relative to the vault) that holds category "
-                        "folders; empty = vault root (default: $VAULT_CATEGORIES_ROOT)")
+                        "folders; pass '' for the vault root (default: "
+                        "$VAULT_CATEGORIES_ROOT; required by new-category)")
     p.add_argument("--toc", default=DEFAULT_TOC_REL,
                    help="table-of-contents note, relative to the vault "
-                        "(default: $VAULT_TOC or 'Table of Contents.md')")
+                        "(default: $VAULT_TOC; required by new-category unless "
+                        "--no-note)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("list", help="list color groups in order")
@@ -424,6 +519,7 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    validate_config(args)
     handlers = {
         "list": cmd_list,
         "check": cmd_check,

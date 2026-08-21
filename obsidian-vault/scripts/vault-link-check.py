@@ -8,7 +8,13 @@ that no link chain reaches).
 
 Configure the vault path with the VAULT_PATH environment variable or --vault, and
 the table-of-contents note with VAULT_TOC or --toc.
-Configure the optional auto-inventoried folder with the flags below.
+
+If the vault has an auto-inventoried folder (a dated-journal folder whose hub
+lists every note in it), configure it with VAULT_INVENTORY_DIR and
+VAULT_INVENTORY_HUB — or the matching flags. Set them and the plain
+`vault-link-check.py` keeps that hub in sync before every walk; leave them unset
+and it does not, and each new dated note is reported as an orphan. Half a pair
+is a setup error, not a silent skip.
 
 Exit codes: 0 = fully reachable, 1 = orphans found, 2 = setup error.
 
@@ -19,11 +25,13 @@ Usage:
   --vault PATH          Vault root (default: $VAULT_PATH, else current dir).
   --toc REL             Table-of-contents note, relative to the vault root
                         (default: $VAULT_TOC, else "Table of Contents.md").
-  --inventory-dir REL   Optional folder whose notes are auto-listed in a hub
-                        (e.g. a dated-journal folder). Requires --inventory-hub.
-  --inventory-hub REL   Hub note that inventories --inventory-dir. When both are
-                        given, the hub is kept in sync with the folder's notes
-                        (additive, idempotent) before the reachability walk.
+  --inventory-dir REL   Folder whose notes are auto-listed in a hub, e.g. a
+                        dated-journal folder (default: $VAULT_INVENTORY_DIR).
+                        Must be given with --inventory-hub.
+  --inventory-hub REL   Hub note that inventories --inventory-dir (default:
+                        $VAULT_INVENTORY_HUB). When both are set, the hub is
+                        kept in sync with the folder's notes (additive,
+                        idempotent) before the reachability walk.
   --quiet               Suppress the remediation hint on failure.
 """
 
@@ -45,8 +53,6 @@ def sync_inventory_hub(vault: Path, inv_dir: str, inv_hub: str) -> int:
     existing hub content. Additive and idempotent. Returns links added."""
     hub = vault / inv_hub
     folder = vault / inv_dir
-    if not hub.is_file() or not folder.is_dir():
-        return 0
     notes = sorted(p.stem for p in folder.glob("*.md"))
     lines = hub.read_text(encoding="utf-8").splitlines()
     head = [ln for ln in lines if not ln.startswith("- [[")]
@@ -64,8 +70,10 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--vault", default=os.environ.get("VAULT_PATH", "."))
     ap.add_argument("--toc", default=os.environ.get("VAULT_TOC", "Table of Contents.md"))
-    ap.add_argument("--inventory-dir")
-    ap.add_argument("--inventory-hub")
+    ap.add_argument("--inventory-dir",
+                    default=os.environ.get("VAULT_INVENTORY_DIR"))
+    ap.add_argument("--inventory-hub",
+                    default=os.environ.get("VAULT_INVENTORY_HUB"))
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
@@ -77,7 +85,23 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
+    # Half a configured pair means the sync silently would not run, and every
+    # new note in the inventoried folder would be reported as an orphan. Fail
+    # closed instead.
+    if bool(args.inventory_dir) != bool(args.inventory_hub):
+        print("ERROR: --inventory-dir and --inventory-hub must be given "
+              "together (or VAULT_INVENTORY_DIR and VAULT_INVENTORY_HUB).",
+              file=sys.stderr)
+        return 2
     if args.inventory_dir and args.inventory_hub:
+        if not (vault / args.inventory_dir).is_dir():
+            print(f"ERROR: inventory dir not found at "
+                  f"{vault / args.inventory_dir}", file=sys.stderr)
+            return 2
+        if not (vault / args.inventory_hub).is_file():
+            print(f"ERROR: inventory hub not found at "
+                  f"{vault / args.inventory_hub}", file=sys.stderr)
+            return 2
         added = sync_inventory_hub(vault, args.inventory_dir, args.inventory_hub)
         if added:
             print(f"Inventory hub: added {added} missing link(s).")

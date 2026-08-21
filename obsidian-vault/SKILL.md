@@ -28,7 +28,24 @@ hardcoded. Set these once per shell (or pass the flags each call):
 export VAULT_PATH="$HOME/path/to/YourVault"       # vault root
 export VAULT_TOC="Table of Contents.md"           # your TOC note (vault-relative)
 export VAULT_CATEGORIES_ROOT=""                    # folder holding categories; "" = vault root
+export VAULT_INVENTORY_DIR="Journal"               # optional: auto-inventoried folder
+export VAULT_INVENTORY_HUB="Journal/Journal.md"    # optional: the hub that lists it
 ```
+
+**These are configuration, not defaults with a fallback.**
+`obsidian_graph.py` fails closed: an unset `VAULT_PATH` is an error (exit 2),
+not "the current directory", and it refuses any target without an `.obsidian/`
+directory. `new-category` additionally requires `VAULT_CATEGORIES_ROOT` (pass
+`--categories-root ''` to mean the vault root — that is a choice, not an
+omission) and a `VAULT_TOC` that exists, because a category note that is not
+hub-linked is an orphan the moment it is created. A forgotten export cannot
+quietly build a category tree in the wrong place.
+
+The last two are only needed if your vault has an auto-inventoried folder — see
+"Verify reachability". Set **both or neither**; half a pair is a setup error.
+
+`python3 scripts/selftest.py` exercises every one of those guards (stdlib only,
+temp vault, exits 0 when they all hold).
 
 The running examples below use a small generic taxonomy — adapt the names to
 your own:
@@ -83,9 +100,12 @@ python3 scripts/vault-link-check.py --vault "$HOME/YourVault" --toc "Table of Co
 ```
 
 Exit codes: `0` clean, `1` orphans found (listed with a remediation hint),
-`2` setup error (TOC not found — check your paths). Run it after any note or
-category creation. A daily scheduled run (cron / systemd timer) is a good way to
-catch drift; wire the same command into whatever scheduler you use.
+`2` setup error (TOC not found, or half an inventory pair — check your paths).
+Read the orphan list, not the exit code alone: a vault with known, accepted
+orphans exits `1` on a perfectly healthy run, and a `2` means it never walked
+the vault at all. Run it after any note or category creation. A daily scheduled
+run (cron / systemd timer) is a good way to catch drift; wire the same command
+into whatever scheduler you use.
 
 If your vault has a dated-journal folder you want a hub to inventory
 automatically, point the checker at it and it will keep the hub in sync
@@ -94,7 +114,17 @@ automatically, point the checker at it and it will keep the hub in sync
 ```
 python3 scripts/vault-link-check.py \
   --inventory-dir "Journal" --inventory-hub "Journal/Journal.md"
+
+# or set VAULT_INVENTORY_DIR / VAULT_INVENTORY_HUB once and just run:
+python3 scripts/vault-link-check.py
 ```
+
+**Configure it, or that sync does not happen.** With neither the flags nor the
+variables, the checker walks the vault without touching the hub, so every note
+added to the inventoried folder since the hub was last written is reported as
+an orphan. The bare command is only equivalent to the flagged one while the hub
+happens to be up to date. Set the pair in the environment for the vault you
+manage, and the plain invocation stays correct.
 
 ## Graph taxonomy and color-coding
 
@@ -133,6 +163,9 @@ restart Obsidian. It is the one command to reach for when growing the taxonomy.
 1. Create the note in its correct folder with a Title Case name.
 2. Add a path-qualified wikilink from the domain hub (or use `new-category` for
    a whole new category, which does this for you).
-3. `python3 scripts/vault-link-check.py` → expect exit 0.
+3. `python3 scripts/vault-link-check.py` (with the inventory pair configured,
+   if your vault uses one) → expect no orphan naming the note you just created.
+   Exit `0` on a vault with no accepted orphans; on a vault that carries known
+   ones, expect exit `1` listing exactly those. Exit `2` is a setup error.
 4. If you touched categories/colors: `obsidian_graph.py check` → expect
    "ordering clean", then restart Obsidian so it does not clobber the edit.
