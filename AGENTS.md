@@ -17,6 +17,12 @@ Keep every skill genericized and free of machine-specific paths or private data
 
 ## Rules
 
+- **Maintainer machine only:** if this checkout lives under `/home/dyadmin`,
+  read `/home/dyadmin/AGENTS.md` first — that is the machine-level contract and
+  it outranks this file. It is not present on a fresh clone, and its absence is
+  not an error; skip this rule if the file does not exist. (Without it, a
+  harness whose instruction loader is bounded by the repo root runs here with
+  zero standing rules.)
 - Read this repo's `README.md`, manifests, scripts, and tests before changing
   behavior.
 - Never read, print, commit, or publish secrets, local `.env` values,

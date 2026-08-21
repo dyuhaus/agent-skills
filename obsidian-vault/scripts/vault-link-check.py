@@ -6,8 +6,9 @@ Contents note by following wikilinks through the domain hubs. This script
 builds the link graph, BFS-walks it from the TOC, and reports orphans (notes
 that no link chain reaches).
 
-Configure the vault path with the VAULT_PATH environment variable or --vault.
-Configure the TOC and (optional) auto-inventoried folder with the flags below.
+Configure the vault path with the VAULT_PATH environment variable or --vault, and
+the table-of-contents note with VAULT_TOC or --toc.
+Configure the optional auto-inventoried folder with the flags below.
 
 Exit codes: 0 = fully reachable, 1 = orphans found, 2 = setup error.
 
@@ -17,7 +18,7 @@ Usage:
 
   --vault PATH          Vault root (default: $VAULT_PATH, else current dir).
   --toc REL             Table-of-contents note, relative to the vault root
-                        (default: "Table of Contents.md").
+                        (default: $VAULT_TOC, else "Table of Contents.md").
   --inventory-dir REL   Optional folder whose notes are auto-listed in a hub
                         (e.g. a dated-journal folder). Requires --inventory-hub.
   --inventory-hub REL   Hub note that inventories --inventory-dir. When both are
@@ -62,7 +63,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--vault", default=os.environ.get("VAULT_PATH", "."))
-    ap.add_argument("--toc", default="Table of Contents.md")
+    ap.add_argument("--toc", default=os.environ.get("VAULT_TOC", "Table of Contents.md"))
     ap.add_argument("--inventory-dir")
     ap.add_argument("--inventory-hub")
     ap.add_argument("--quiet", action="store_true")
