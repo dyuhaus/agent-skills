@@ -30,7 +30,13 @@ infrastructure can pick them up. Paths are placeholders (`$VAULT_PATH`,
 
 Clone the repo and run the installer. It symlinks each skill folder into your
 agent skill directories (`~/.claude/skills/` and `~/skills/` by default),
-creating them if missing and never clobbering a real directory:
+creating them if missing and never clobbering a real directory.
+
+`~/skills/` is the **harness-neutral root**: keep every skill linked there and
+point a new harness's skill loader at that one directory, rather than adding a
+target per harness. `SKILL.md` is read unmodified by Claude Code, Codex and
+other skill-aware harnesses, so distribution — not format — is the only thing
+that stops a skill reaching a new tool:
 
 ```bash
 git clone https://github.com/dyuhaus/agent-skills.git

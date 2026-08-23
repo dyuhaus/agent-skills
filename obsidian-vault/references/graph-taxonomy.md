@@ -56,10 +56,13 @@ Color groups sit under the key `colorGroups`, an array of:
 
 ## Command reference
 
-Script: `../scripts/obsidian_graph.py` (python3, stdlib only). Vault defaults to
-`$VAULT_PATH`; the categories root to `$VAULT_CATEGORIES_ROOT` (empty = vault
-root); the TOC to `$VAULT_TOC`. Override any with `--vault`,
-`--categories-root`, `--toc`. All mutating commands back up `graph.json` to
+Script: `../scripts/obsidian_graph.py` (python3, stdlib only). The vault comes
+from `$VAULT_PATH`, the categories root from `$VAULT_CATEGORIES_ROOT` (empty =
+vault root), the TOC from `$VAULT_TOC`. Override any with `--vault`,
+`--categories-root`, `--toc`. **These are required, not defaulted:** an unset
+`VAULT_PATH`, a target with no `.obsidian/` directory, a categories root that
+does not exist, or a missing TOC each stop the run at exit 2 with nothing
+written. All mutating commands back up `graph.json` to
 `graph.json.bak`, write pretty JSON (2-space indent) preserving all
 non-`colorGroups` keys, warn if Obsidian is running, and accept `--dry-run`.
 
@@ -98,8 +101,13 @@ Every note must be reachable from the Table of Contents via wikilinks.
 any category creation, verify with the link checker:
 
 ```
-python3 ../scripts/vault-link-check.py     # exit 0 = clean
+python3 ../scripts/vault-link-check.py     # 0 = clean, 1 = orphans, 2 = setup error
 ```
+
+Read the orphan list, not the exit code alone, and set
+`VAULT_INVENTORY_DIR` / `VAULT_INVENTORY_HUB` if your vault has an
+auto-inventoried folder — without them that hub is not synced and its new notes
+show up as orphans.
 
 ## Hand-editing fallback
 
