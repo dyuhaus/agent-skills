@@ -36,7 +36,10 @@ Keep every skill genericized and free of machine-specific paths or private data
 - Default branch: main (protected, PR-only, squash merge)
 - Branches: feat/ fix/ chore/ docs/ exp/ (+ agent/<harness>/ optional)
 - Commits: Conventional Commits; hooks must pass; never --no-verify
-- Review: run `/code-reviewer` on the branch BEFORE opening the PR; address all
-  findings, then request David's approval (agent PRs require it)
+- Review: BEFORE opening a PR, get an adversarial branch review from something
+  that did not write the code, using the active harness's native mechanism;
+  address every finding. Docs-only diffs may record `docs-only, no review`.
+- Merge: routine reviewed agent PRs may be machine-merged; deploy-coupled or
+  unreviewed PRs go to David through the approval relay.
 - Deploy coupling: none (this repo ships skill files; nothing is deployed on merge)
 - Long-lived branch exceptions: none
