@@ -29,7 +29,7 @@ infrastructure can pick them up. Paths are placeholders (`$VAULT_PATH`,
 ## Install
 
 Clone the repo and run the installer. It symlinks each skill folder into your
-agent skill directories (`~/.claude/skills/` and `~/skills/` by default),
+agent skill directories (`~/.codex/skills/` and `~/skills/` by default),
 creating them if missing and never clobbering a real directory.
 
 `~/skills/` is the **harness-neutral root**: keep every skill linked there and
@@ -42,7 +42,7 @@ that stops a skill reaching a new tool:
 git clone https://github.com/dyuhaus/agent-skills.git
 cd agent-skills
 ./install.sh                      # install into the default targets
-./install.sh --targets ~/.claude/skills   # or a specific directory
+./install.sh --targets ~/.codex/skills   # or a specific directory
 ./install.sh --dry-run            # preview without changing anything
 ./install.sh --uninstall          # remove only the symlinks it created
 ```
