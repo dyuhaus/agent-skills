@@ -20,7 +20,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Default install targets. Override with one or more --targets DIR.
-DEFAULT_TARGETS=("$HOME/.claude/skills" "$HOME/skills")
+DEFAULT_TARGETS=("$HOME/.codex/skills" "$HOME/skills")
 TARGETS=()
 FORCE=0
 DRY_RUN=0
